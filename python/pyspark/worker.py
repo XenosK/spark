@@ -3375,6 +3375,9 @@ def main(infile, outfile):
             out_iter = func(split_index, iterator)
             try:
                 serializer.dump_stream(out_iter, outfile)
+                # Explicit flush for Python 3.12+ on Windows to ensure data is written immediately
+                # when using unbuffered mode
+                outfile.flush()
             finally:
                 if hasattr(out_iter, "close"):
                     out_iter.close()
@@ -3399,14 +3402,19 @@ def main(infile, outfile):
 
     # Mark the beginning of the accumulators section of the output
     write_int(SpecialLengths.END_OF_DATA_SECTION, outfile)
+    # Explicit flush for Python 3.12+ on Windows to ensure data is written immediately
+    # when using unbuffered mode
+    outfile.flush()
     send_accumulator_updates(outfile)
 
     # check end of stream
     if read_int(infile) == SpecialLengths.END_OF_STREAM:
         write_int(SpecialLengths.END_OF_STREAM, outfile)
+        outfile.flush()
     else:
         # write a different value to tell JVM to not reuse this worker
         write_int(SpecialLengths.END_OF_DATA_SECTION, outfile)
+        outfile.flush()
         sys.exit(-1)
 
 
