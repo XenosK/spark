@@ -778,6 +778,16 @@ def local_connect_and_auth(
     tuple
         with (sockfile, sock)
     """
+    # Python 3.12+ on Windows has issues with buffered socket files causing crashes.
+    # Use unbuffered mode (0) for Python 3.12+ on Windows to avoid EOFException.
+    _is_python312_plus_windows = (
+        sys.version_info >= (3, 12) and platform.system() == "Windows"
+    )
+    buffer_size = (
+        0 if _is_python312_plus_windows
+        else int(os.environ.get("SPARK_BUFFER_SIZE", 65536))
+    )
+    
     is_unix_domain_socket = isinstance(conn_info, str) and auth_secret is None
     if is_unix_domain_socket:
         sock_path = conn_info
@@ -787,7 +797,7 @@ def local_connect_and_auth(
             sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
             sock.settimeout(int(os.environ.get("SPARK_AUTH_SOCKET_TIMEOUT", 15)))
             sock.connect(sock_path)
-            sockfile = sock.makefile("rwb", int(os.environ.get("SPARK_BUFFER_SIZE", 65536)))
+            sockfile = sock.makefile("rwb", buffer_size)
             return (sockfile, sock)
         except socket.error as e:
             if sock is not None:
@@ -812,7 +822,7 @@ def local_connect_and_auth(
             sock = socket.socket(af, socktype, proto)
             sock.settimeout(int(os.environ.get("SPARK_AUTH_SOCKET_TIMEOUT", 15)))
             sock.connect(sa)
-            sockfile = sock.makefile("rwb", int(os.environ.get("SPARK_BUFFER_SIZE", 65536)))
+            sockfile = sock.makefile("rwb", buffer_size)
             assert isinstance(auth_secret, str)
             _do_server_auth(sockfile, auth_secret)
             return (sockfile, sock)
